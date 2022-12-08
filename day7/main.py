@@ -79,8 +79,6 @@ class Filesystem:
         # Register the node
         node.id = self.get_next_id()
         node.set_parent_id(parent_id)
-        # dirty hack for part 2
-        node.set_total_size()
         self.nodes[self.get_next_id()] = node
         # Link it to its parent
         # Since python is reference based,
@@ -156,22 +154,35 @@ def part1():
 
 
 def part2():
-    with open("example.txt", "r") as f:
-        # with open("input.txt", "r") as f:
+    # with open("example.txt", "r") as f:
+    with open("input.txt", "r") as f:
         data = [line.strip() for line in f.readlines()]
 
     fs = create_filesystem(data)
-    total_space = 70000000
+
+    node_list = list(fs.nodes.values())
+    for node in node_list:
+        node.set_total_size()
+
+    sorted_node_list = sorted(node_list, key=lambda v: v.total_size)
+    total_size = 70000000
     update_size = 30000000
+    threshold_size = total_size - update_size
 
-    sorted_node_list = [v for (k,v) in sorted(fs.nodes.items(), key=lambda kv: kv[1].total_size, reverse=True)]
+    used_size = sorted_node_list[-1].total_size
+    print(f"current used size: {sorted_node_list[-1].name} {used_size}")
+
+    # just want to be done with it
+    fitted_sizes = []
     for node in sorted_node_list:
-        print(node.name, node.total_size)
-        # if (node.total_size + update_size) <= total_space:
+        if (used_size - node.total_size) <= threshold_size:
             # print(node.total_size)
+            fitted_sizes.append(node.total_size)
+    print(fitted_sizes[0])
 
 
 
 
-part1()
+
+# part1()
 part2()
