@@ -56,14 +56,9 @@ impl Grid {
     fn _get_neighbors(&self, node: Node, direction: &Direction) -> Vec<Node> {
         let mut current_node = node;
         let mut neighbors = Vec::new();
-        loop {
-            match self._get_neighbor(current_node, direction) {
-                Some(nn) => {
-                    neighbors.push(nn);
-                    current_node = nn;
-                }
-                None => break,
-            };
+        while let Some(next_neighbor) = self._get_neighbor(current_node, direction) {
+            neighbors.push(next_neighbor);
+            current_node = next_neighbor;
         }
         neighbors
     }
@@ -90,8 +85,7 @@ impl Grid {
         self.nodes
             .iter()
             .filter(|&n| self.node_is_visible(*n))
-            .collect::<Vec<&Node>>()
-            .len() as i32
+            .count() as i32
     }
     fn scenic_score(&self, node: Node) -> i32 {
         let mut direction_scores: Vec<i32> = Vec::new();
