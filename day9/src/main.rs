@@ -42,8 +42,7 @@ enum Direction {
 
 #[derive(Debug)]
 struct Rope {
-    head: RopeHead,
-    tail: RopeTail,
+    knots: Vec<Knot>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
@@ -53,62 +52,71 @@ struct Position {
 }
 
 #[derive(Debug)]
-struct RopeHead {
+struct Knot {
     current_position: Position,
     previous_position: Position,
-}
-
-#[derive(Debug)]
-struct RopeTail {
-    current_position: Position,
     visited_positions: Vec<Position>,
 }
 
 impl Rope {
-    fn new() -> Self {
+    fn new(knots: u32) -> Self {
         let init_position = Position { x: 0, y: 0 };
-        let head = RopeHead {
-            current_position: init_position,
-            previous_position: init_position,
-        };
-        let tail = RopeTail {
-            current_position: init_position,
-            visited_positions: vec![init_position],
-        };
-        Rope { head, tail }
+        Rope {
+            knots: (1..=knots)
+                .into_iter()
+                .map(|_| Knot {
+                    current_position: init_position,
+                    previous_position: init_position,
+                    visited_positions: vec![init_position],
+                })
+                .collect(),
+        }
+    }
+    fn head(&self) -> &Knot {
+        &self.knots[0]
+    }
+    fn head_mut(&mut self) -> &mut Knot {
+        &mut self.knots[0]
+    }
+    fn knot(&self, number: u32) -> &Knot {
+        &self.knots[number as usize]
+    }
+    fn knot_mut(&mut self, number: u32) -> &mut Knot {
+        &mut self.knots[number as usize]
     }
     fn move_direction(&mut self, direction: Direction) {
-        self.head.previous_position = self.head.current_position;
+        self.head_mut().previous_position = self.head().current_position;
         match direction {
             Direction::Up => {
-                self.head.current_position.y += 1;
+                self.head_mut().current_position.y += 1;
                 self.move_tail()
             }
             Direction::Down => {
-                self.head.current_position.y -= 1;
+                self.head_mut().current_position.y -= 1;
                 self.move_tail()
             }
             Direction::Left => {
-                self.head.current_position.x -= 1;
+                self.head_mut().current_position.x -= 1;
                 self.move_tail()
             }
             Direction::Right => {
-                self.head.current_position.x += 1;
+                self.head_mut().current_position.x += 1;
                 self.move_tail()
             }
         }
     }
     fn move_tail(&mut self) {
-        if (self.head.current_position.x - self.tail.current_position.x).abs() > 1
-            || (self.head.current_position.y - self.tail.current_position.y).abs() > 1
+        if (self.head().current_position.x - self.knot(1).current_position.x).abs() > 1
+            || (self.head().current_position.y - self.knot(1).current_position.y).abs() > 1
         {
-            self.tail.current_position = self.head.previous_position;
-            self.tail.visited_positions.push(self.tail.current_position)
+            let knot1_prev_current = self.knot(1).current_position;
+            self.knot_mut(1).current_position = self.head().previous_position;
+            self.knot_mut(1).visited_positions.push(knot1_prev_current)
         }
     }
-    fn count_visited_tail_positions(&self) -> u32 {
+    fn count_visited_tail_positions(&mut self) -> u32 {
         let mut seen: Vec<Position> = Vec::new();
-        for pos in self.tail.visited_positions.iter() {
+        for pos in self.knot(1).visited_positions.iter() {
             if !seen.contains(pos) {
                 seen.push(*pos)
             }
@@ -119,21 +127,22 @@ impl Rope {
 
 impl fmt::Display for Rope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let head = self.head();
         write!(
             f,
-            "<Rope Head[{},{}] Tail[{},{}]>",
-            self.head.current_position.x,
-            self.head.current_position.y,
-            self.tail.current_position.x,
-            self.tail.current_position.y
+            "<Rope Knot1[{},{}] Knot2[{},{}]>",
+            head.current_position.x,
+            head.current_position.y,
+            self.knots[1].current_position.x,
+            self.knots[1].current_position.y
         )
     }
 }
 
 fn part1() {
-    // let instructions = parse_instructions("example.txt");
-    let instructions = parse_instructions("input.txt");
-    let mut rope = Rope::new();
+    let instructions = parse_instructions("example.txt");
+    // let instructions = parse_instructions("input.txt");
+    let mut rope = Rope::new(2);
     for instruction in instructions.iter() {
         for _ in 1..=instruction.amount {
             rope.move_direction(instruction.direction)
@@ -142,4 +151,15 @@ fn part1() {
     let visited_count = rope.count_visited_tail_positions();
     println!("{visited_count}");
 }
-fn part2() {}
+fn part2() {
+    let instructions = parse_instructions("example.txt");
+    // let instructions = parse_instructions("input.txt");
+    let mut rope = Rope::new(2);
+    for instruction in instructions.iter() {
+        for _ in 1..=instruction.amount {
+            rope.move_direction(instruction.direction)
+        }
+    }
+    let visited_count = rope.count_visited_tail_positions();
+    println!("{visited_count}");
+}
