@@ -110,18 +110,19 @@ impl Rope {
             || (self.head().current_position.y - self.knot(1).current_position.y).abs() > 1
         {
             // head has moved away from tail, recalculate all the other knots
-            for (i, knot) in self.knots.iter_mut().enumerate() {
+            for i in 0..self.knots.len() {
+                let i = i as u32;
                 if i == 0 {
                     continue;
                 }
                 // set the previous position of the knot to its current position
-                knot.previous_position = knot.current_position;
+                self.knot_mut(i).previous_position = self.knot(i).current_position;
                 // get the previous position of the knot ahead of it
                 let new_pos = self.knot(i as u32 - 1).previous_position;
                 // set the current position of this knot to that previous position
-                knot.current_position = new_pos;
+                self.knot_mut(i).current_position = new_pos;
                 // update the visited positions with the new position
-                knot.visited_positions.push(new_pos)
+                self.knot_mut(i).visited_positions.push(new_pos)
             }
         }
     }
