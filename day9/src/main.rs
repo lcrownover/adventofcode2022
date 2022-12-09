@@ -51,7 +51,7 @@ struct Position {
     y: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Knot {
     current_position: Position,
     previous_position: Position,
@@ -109,9 +109,20 @@ impl Rope {
         if (self.head().current_position.x - self.knot(1).current_position.x).abs() > 1
             || (self.head().current_position.y - self.knot(1).current_position.y).abs() > 1
         {
-            let knot1_prev_current = self.knot(1).current_position;
-            self.knot_mut(1).current_position = self.head().previous_position;
-            self.knot_mut(1).visited_positions.push(knot1_prev_current)
+            // head has moved away from tail, recalculate all the other knots
+            for (i, knot) in self.knots.iter_mut().enumerate() {
+                if i == 0 {
+                    continue;
+                }
+                // set the previous position of the knot to its current position
+                knot.previous_position = knot.current_position;
+                // get the previous position of the knot ahead of it
+                let new_pos = self.knot(i as u32 - 1).previous_position;
+                // set the current position of this knot to that previous position
+                knot.current_position = new_pos;
+                // update the visited positions with the new position
+                knot.visited_positions.push(new_pos)
+            }
         }
     }
     fn count_visited_tail_positions(&mut self) -> u32 {
