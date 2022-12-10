@@ -32,6 +32,26 @@ where
     instructions
 }
 
+fn move_direction(position: Position, direction: Direction) -> Position {
+    let mut new_pos = position;
+    match direction {
+        Direction::Up => {
+            new_pos.y += 1;
+        }
+        Direction::Down => {
+            new_pos.y -= 1;
+        }
+        Direction::Left => {
+            new_pos.x -= 1;
+        }
+        Direction::Right => {
+            new_pos.x += 1;
+        }
+        Direction::None => {}
+    }
+    new_pos
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Direction {
     None,
@@ -94,42 +114,18 @@ impl Rope {
         if (to.y - from.y).abs() > 1 {
             // it moved, check if up or down
             match to.y - from.y > 0 {
-                // positive, so it moved up
-                true => directions.push(Direction::Up),
-                // negative, so it moved down
-                false => directions.push(Direction::Down),
+                true => directions.push(Direction::Up), // positive, so it moved up
+                false => directions.push(Direction::Down), // negative, so it moved down
             }
         }
-        // check horizontally
         if (to.x - from.x).abs() > 1 {
-            // it moved, check if left or right
+            // check horizontally
             match to.x - from.x > 0 {
-                // positive, so it moved right
-                true => directions.push(Direction::Right),
-                // negative, so it moved left
-                false => directions.push(Direction::Left),
+                true => directions.push(Direction::Right), // positive, so it moved right
+                false => directions.push(Direction::Left), // negative, so it moved left
             }
         }
         directions
-    }
-    fn move_direction(&self, position: Position, direction: Direction) -> Position {
-        let mut new_pos = position;
-        match direction {
-            Direction::Up => {
-                new_pos.y += 1;
-            }
-            Direction::Down => {
-                new_pos.y -= 1;
-            }
-            Direction::Left => {
-                new_pos.x -= 1;
-            }
-            Direction::Right => {
-                new_pos.x += 1;
-            }
-            Direction::None => {}
-        }
-        new_pos
     }
     fn move_rope(&mut self, direction: Direction) {
         // set the previous position to the current position
@@ -139,7 +135,7 @@ impl Rope {
         self.head_mut().previous_directions = vec![direction];
         // move the head, then move the tail
         let head_position = self.head_mut().current_position;
-        self.head_mut().current_position = self.move_direction(head_position, direction);
+        self.head_mut().current_position = move_direction(head_position, direction);
         self.move_tail()
     }
     fn move_tail(&mut self) {
@@ -147,36 +143,34 @@ impl Rope {
             || (self.head().current_position.y - self.knot(1).current_position.y).abs() > 1
         {
             // head has moved away from tail, recalculate all the other knots
-            for i in 0..self.knots.len() {
+            // skip index 0, thats the head
+            for i in 1..self.knots.len() {
                 let i = i as u32;
-                // skip the first knot, that's the head
-                if i == 0 {
-                    continue;
-                }
                 // the head of the tail (knots[1]) governs the movement of
                 // all the rest of the knots in the tail. we can calculate
                 // and track the last movement action and replay that on
                 // all downstream knots that need to move
+                let mut new_pos = self.knot(i).current_position;
                 if i == 1 {
                     // this is the head of the tail, it moves unique to the other knots
                     // it always follows the previous location of the head.
                     let to = self.head().previous_position;
                     let from = self.knot(i).current_position;
-                    self.knot_mut(i).current_position = self.head().previous_position;
+                    new_pos = self.head().previous_position;
+                    self.knot_mut(i).current_position = new_pos;
                     self.knot_mut(i).previous_directions = self.calculate_directions(to, from);
-                    continue;
-                }
-                // all other knots move equal to the previous direction on i-1
-                let mut knot = self.knot_mut(i);
-                let directions = self.knot(i-1).previous_directions;
-                for i in 0..directions.len() {
-                    let pos = self.knot(i as u32).current_position;
-                    knot.current_position = self.move_direction(pos, directions[i])
+                } else {
+                    // all other knots move equal to the previous direction on i-1
+                    let directions: Vec<Direction> = self.knot(i - 1).previous_directions.clone();
+                    let mut knot = self.knot_mut(i);
+                    for i in 0..directions.len() {
+                        new_pos = move_direction(new_pos, directions[i])
+                    }
+                    knot.current_position = new_pos;
                 }
 
                 // update the visited positions with the new current position
-                let current_position = self.knot(i).current_position;
-                self.knot_mut(i).visited_positions.push(current_position)
+                self.knot_mut(i).visited_positions.push(new_pos)
             }
         }
     }
@@ -188,7 +182,6 @@ impl Rope {
             }
             for pos in knot.visited_positions.iter() {
                 if !seen.contains(pos) {
-                    // println!("pushing {:?}", pos);
                     seen.push(*pos)
                 }
             }
@@ -229,8 +222,8 @@ fn part2() {
     let mut rope = Rope::new(10);
     for instruction in instructions.iter() {
         for _ in 1..=instruction.amount {
+            rope.move_rope(instruction.direction);
             println!("{}", rope);
-            rope.move_rope(instruction.direction)
         }
     }
     let visited_count = rope.count_visited_tail_positions();
