@@ -2,7 +2,7 @@ use core::fmt;
 use std::{fs, path::PathBuf};
 
 fn main() {
-    part1();
+    // part1();
     part2();
 }
 
@@ -32,7 +32,7 @@ where
     instructions
 }
 
-fn move_direction(position: Position, direction: Direction) -> Position {
+fn move_direction(position: Position, direction: &Direction) -> Position {
     let mut new_pos = position;
     match direction {
         Direction::Up => {
@@ -47,14 +47,14 @@ fn move_direction(position: Position, direction: Direction) -> Position {
         Direction::Right => {
             new_pos.x += 1;
         }
-        Direction::None => {}
+        Direction::Stay => {}
     }
     new_pos
 }
 
 #[derive(Debug, Clone, Copy)]
 enum Direction {
-    None,
+    Stay,
     Up,
     Down,
     Right,
@@ -78,6 +78,7 @@ struct Knot {
     previous_position: Position,
     previous_directions: Vec<Direction>,
     visited_positions: Vec<Position>,
+    has_moved: bool,
 }
 
 impl Rope {
@@ -89,8 +90,9 @@ impl Rope {
                 .map(|_| Knot {
                     current_position: init_position,
                     previous_position: init_position,
-                    previous_directions: vec![Direction::None],
+                    previous_directions: vec![Direction::Stay],
                     visited_positions: vec![init_position],
+                    has_moved: false,
                 })
                 .collect(),
         }
@@ -110,15 +112,19 @@ impl Rope {
     fn calculate_directions(&self, to: Position, from: Position) -> Vec<Direction> {
         // calculate which direction to return based on the coordinate change
         let mut directions: Vec<Direction> = Vec::new();
+        println!("from:{:?}", from);
+        println!("to:{:?}", to);
         // check vertically
-        if (to.y - from.y).abs() > 1 {
+        if (to.y - from.y).abs() > 0 {
+            println!("it moved vert");
             // it moved, check if up or down
             match to.y - from.y > 0 {
                 true => directions.push(Direction::Up), // positive, so it moved up
                 false => directions.push(Direction::Down), // negative, so it moved down
             }
         }
-        if (to.x - from.x).abs() > 1 {
+        if (to.x - from.x).abs() > 0 {
+            println!("it moved horiz");
             // check horizontally
             match to.x - from.x > 0 {
                 true => directions.push(Direction::Right), // positive, so it moved right
@@ -128,6 +134,7 @@ impl Rope {
         directions
     }
     fn move_rope(&mut self, direction: Direction) {
+        println!("moving head: {:?}", direction);
         // set the previous position to the current position
         let current_head_position = self.head().current_position;
         self.head_mut().previous_position = current_head_position;
@@ -135,43 +142,84 @@ impl Rope {
         self.head_mut().previous_directions = vec![direction];
         // move the head, then move the tail
         let head_position = self.head_mut().current_position;
-        self.head_mut().current_position = move_direction(head_position, direction);
+        self.head_mut().current_position = move_direction(head_position, &direction);
+        self.head_mut().has_moved = true;
         self.move_tail()
     }
     fn move_tail(&mut self) {
+        println!("starting move tail");
         if (self.head().current_position.x - self.knot(1).current_position.x).abs() > 1
             || (self.head().current_position.y - self.knot(1).current_position.y).abs() > 1
         {
+            println!("head moved farther than 1 from second knot, moving rest of tail");
             // head has moved away from tail, recalculate all the other knots
             // skip index 0, thats the head
+            // in the beginning, a knot shouldnt move unless the previous has already moved
+            let mut current_mover = 0;
             for i in 1..self.knots.len() {
                 let i = i as u32;
+                println!("moving knot[{}]", i);
                 // the head of the tail (knots[1]) governs the movement of
                 // all the rest of the knots in the tail. we can calculate
                 // and track the last movement action and replay that on
                 // all downstream knots that need to move
+                //
+                // first, we check if the previous knot has moved. if it hasnt,
+                // that means that we shouldnt move this knot
+                if !self.knot(i - 1).has_moved {
+                    println!(
+                        "knot[{}] is not moving because knot[{}] either just moved hasnt moved yet",
+                        i,
+                        i - 1
+                    );
+                    continue;
+                }
                 let mut new_pos = self.knot(i).current_position;
                 if i == 1 {
                     // this is the head of the tail, it moves unique to the other knots
                     // it always follows the previous location of the head.
-                    let to = self.head().previous_position;
-                    let from = self.knot(i).current_position;
+                    // new_pos is what we're gonna assign to the current knot
+                    // we store in a var outside this scope so we can
+                    // append it to the knot's visited positions
                     new_pos = self.head().previous_position;
-                    self.knot_mut(i).current_position = new_pos;
+                    // now we need to calculate the directions that every other node
+                    // will take to copy how knot[1] moved.
+                    // we set "to" to the new position of knot[1]
+                    let to = new_pos;
+                    // then "from" should be the current position of the current knot
+                    let from = self.knot(i).current_position;
                     self.knot_mut(i).previous_directions = self.calculate_directions(to, from);
+                    println!(
+                        "previous directions of knot1: {:?}",
+                        self.knot(i).previous_directions
+                    );
+                    // finally, we set the current position of this knot[1]
+                    // to the new position
+                    self.knot_mut(i).current_position = new_pos;
                 } else {
                     // all other knots move equal to the previous direction on i-1
-                    let directions: Vec<Direction> = self.knot(i - 1).previous_directions.clone();
-                    let mut knot = self.knot_mut(i);
-                    for i in 0..directions.len() {
-                        new_pos = move_direction(new_pos, directions[i])
+                    let directions: Vec<Direction> = self
+                        .knot(i - 1)
+                        .previous_directions
+                        .iter()
+                        .map(|d| d.to_owned())
+                        .collect();
+                    println!("directions to do:  {:?}", directions);
+                    let knot = self.knot_mut(i);
+                    for direction in directions.iter() {
+                        new_pos = move_direction(new_pos, direction)
                     }
                     knot.current_position = new_pos;
+                    knot.previous_directions = directions;
                 }
 
                 // update the visited positions with the new current position
-                self.knot_mut(i).visited_positions.push(new_pos)
+                self.knot_mut(i).visited_positions.push(new_pos);
+
+                // now this knot has moved
+                current_mover = i;
             }
+            self.knot_mut(current_mover).has_moved = true;
         }
     }
     fn count_visited_tail_positions(&mut self) -> u32 {
@@ -220,6 +268,7 @@ fn part2() {
     let instructions = parse_instructions("example2.txt");
     // let instructions = parse_instructions("input.txt");
     let mut rope = Rope::new(10);
+    println!("{}", rope);
     for instruction in instructions.iter() {
         for _ in 1..=instruction.amount {
             rope.move_rope(instruction.direction);
